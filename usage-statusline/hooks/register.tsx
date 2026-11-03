@@ -56,8 +56,30 @@ export const register: Register = (on) => {
 
   // The usage figures, pushed, not polled.
   on('session.measure', async ($, e, next) => {
+    // The measure event's `context.percent` counts against the model's own
+    // window (1M on `[1m]` models), but the desktop app's own indicator
+    // counts against the smaller compaction (autocompact) window — the two
+    // disagree by design there. The event never carries the breakdown; ask
+    // for one (`summary` estimates locally, no token-count requests): its
+    // `percentage` over `rawMaxTokens` is the desktop-compatible figure.
+    let desktopPercent: number | null = null
+    let compactionWindow: number | null = null
+    try {
+      const usage = await $.session.usage({ breakdown: 'summary' })
+      const b = usage.context.breakdown
+      if (b) {
+        desktopPercent = b.percentage
+        compactionWindow = b.rawMaxTokens
+      }
+    } catch {
+      // No session bound or the op refused: the model-window figure stands in.
+    }
+
     await update($, snap, () => ({
-      contextPercent: e.context.percent ?? null,
+      contextPercent: desktopPercent ?? e.context.percent ?? null,
+      contextPercentFull: e.context.percent ?? null,
+      contextWindow: e.context.window,
+      compactionWindow,
       rateLimits: e.rateLimits.map(r => ({ kind: r.kind, percentUsed: r.percentUsed })),
       costUsd: e.cost?.usd ?? null,
     } satisfies UsageSnapshot))
@@ -153,9 +175,18 @@ export const register: Register = (on) => {
     }
     if (s?.contextPercent != null) {
       const pct = s.contextPercent
+      // On a model whose own window is larger than the compaction window
+      // (1M-context models), the two fills differ; the desktop app's
+      // indicator shows the compaction one, so the full-window fill follows
+      // in brackets to keep both readings visible.
+      const fullNote =
+        s.contextWindow != null && s.compactionWindow != null && s.contextWindow > s.compactionWindow
+          ? ` (1M ${fmtPct(s.contextPercentFull ?? (pct * s.contextWindow) / s.compactionWindow)})`
+          : ''
       line.push(
         <Text color={pct >= 90 ? 'error' : pct >= 75 ? 'warning' : 'subtle'}>
           ctx {fmtPct(pct)}
+          {fullNote}
         </Text>,
       )
     }
@@ -239,7 +270,11 @@ function formatPlain(s: UsageSnapshot | null, m: string | null): string {
     bits.push(m)
   }
   if (s?.contextPercent != null) {
-    bits.push(`ctx ${fmtPct(s.contextPercent)}`)
+    const fullNote =
+      s.contextWindow != null && s.compactionWindow != null && s.contextWindow > s.compactionWindow
+        ? ` (1M ${fmtPct(s.contextPercentFull ?? (s.contextPercent * s.contextWindow) / s.compactionWindow)})`
+        : ''
+    bits.push(`ctx ${fmtPct(s.contextPercent)}${fullNote}`)
   }
   for (const r of s?.rateLimits ?? []) {
     bits.push(`${KIND_LABEL[r.kind] ?? r.kind} ${fmtPct(r.percentUsed)}`)

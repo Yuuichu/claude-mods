@@ -15,7 +15,7 @@ Or run Claude Code with the mod folder loaded, e.g. `claude --plugin-dir <path t
 
 ## How it works
 
-- `session.measure` pushes the usage figures (context %, rate-limit windows, cost) — no polling.
+- `session.measure` pushes the usage figures (context %, rate-limit windows, cost) — no polling. The context % matches the desktop app's own indicator: how full the compaction (auto-compact) window is, which on 1M-context models is much smaller than the model's own window; the model-window fill follows in brackets (`ctx 79% (1M 19%)`) on such models.
 - `turn.step` (a streaming hook) counts text/thinking/tool-argument output and clocks it to estimate tok/s live; the stop chunk's `usage.output_tokens` finalizes the exact figure.
 - `session.start` picks up the desktop app's own session id (`CLAUDE_CODE_HOST_SESSION_ID`); outside the desktop app the link button is omitted.
 - The line is drawn by a `ui.render` hook for the `AbovePrompt` band on terminal and desktop surfaces; before the band has ever drawn, the same line is kept in `$.ui.status` so it still shows on other surfaces.

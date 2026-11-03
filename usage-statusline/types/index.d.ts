@@ -1,7 +1,16 @@
 /** The usage figures the band draws, as the last `session.measure` left them. */
 export type UsageSnapshot = {
-  /** Context window fill as a whole percentage; null until a response of the live window reported one. */
+  /**
+   * How full the compaction window is — the figure the desktop app's own
+   * indicator shows; null until the engine answered a usage call.
+   */
   contextPercent: number | null
+  /** How full the model's own window is; null before the live window's first response. */
+  contextPercentFull: number | null
+  /** The model's own window, in tokens. */
+  contextWindow: number | null
+  /** The compaction window the primary figure measures against; null when the engine gave none. */
+  compactionWindow: number | null
   /** One row per rate-limit window the last response reported. */
   rateLimits: { kind: string; percentUsed: number }[]
   /** Session cost in US dollars; null where the host keeps no ledger. */

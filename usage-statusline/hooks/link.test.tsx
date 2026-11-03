@@ -21,6 +21,13 @@ for (const surface of ['terminal', 'desktop'] as const) {
     mock.env(on, { CLAUDE_CODE_HOST_SESSION_ID: 'local_0123abcd-ef45-6789-abcd-0123456789ab' })
     on('session.start', (_, e) => ({ cwd: e.cwd }))
     on('session.measure', () => ({ changed: [] }))
+    on('session.usage', () => ({
+      value: {
+        startedAt: 0,
+        context: { window: 200000 },
+        rateLimits: [],
+      },
+    }))
     on('ui.status', () => ({ value: undefined }))
     on('ui.toast', () => ({ value: undefined }))
     on('ui.copy', () => ({ value: { isCopied: false, reason: 'no-surface' } }))
