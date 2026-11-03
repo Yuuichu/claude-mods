@@ -178,10 +178,15 @@ export const register: Register = (on) => {
       // On a model whose own window is larger than the compaction window
       // (1M-context models), the two fills differ; the desktop app's
       // indicator shows the compaction one, so the full-window fill follows
-      // in brackets to keep both readings visible.
+      // in brackets to keep both readings visible. Only when the live
+      // window's own response reported one — extrapolating from the
+      // compaction fill would invent a figure.
       const fullNote =
-        s.contextWindow != null && s.compactionWindow != null && s.contextWindow > s.compactionWindow
-          ? ` (1M ${fmtPct(s.contextPercentFull ?? (pct * s.contextWindow) / s.compactionWindow)})`
+        s.contextPercentFull != null &&
+        s.contextWindow != null &&
+        s.compactionWindow != null &&
+        s.contextWindow > s.compactionWindow
+          ? ` (1M ${fmtPct(s.contextPercentFull)})`
           : ''
       line.push(
         <Text color={pct >= 90 ? 'error' : pct >= 75 ? 'warning' : 'subtle'}>
@@ -271,8 +276,11 @@ function formatPlain(s: UsageSnapshot | null, m: string | null): string {
   }
   if (s?.contextPercent != null) {
     const fullNote =
-      s.contextWindow != null && s.compactionWindow != null && s.contextWindow > s.compactionWindow
-        ? ` (1M ${fmtPct(s.contextPercentFull ?? (s.contextPercent * s.contextWindow) / s.compactionWindow)})`
+      s.contextPercentFull != null &&
+      s.contextWindow != null &&
+      s.compactionWindow != null &&
+      s.contextWindow > s.compactionWindow
+        ? ` (1M ${fmtPct(s.contextPercentFull)})`
         : ''
     bits.push(`ctx ${fmtPct(s.contextPercent)}${fullNote}`)
   }

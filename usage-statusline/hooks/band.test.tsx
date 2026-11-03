@@ -164,6 +164,61 @@ test('where the engine answers no breakdown the band falls back to the measure-e
   await ui.unmount()
 })
 
+test('before the live window has a response the band shows only the compaction fill', async ($, on) => {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', () => ({ changed: [] }))
+  // A fresh (or just-compacted) session: the breakdown knows the compaction
+  // window, but no response of the live window has ever reported its fill.
+  on('session.usage', () => ({
+    value: {
+      startedAt: 0,
+      context: {
+        window: 1000000,
+        breakdown: {
+          categories: [],
+          totalTokens: 52000,
+          maxTokens: 252000,
+          rawMaxTokens: 252000,
+          autocompactSource: 'clientdata',
+          percentage: 21,
+          gridRows: [],
+          model: 'claude-opus-5-5[1m]',
+          memoryFiles: [],
+          mcpTools: [],
+          agents: [],
+          isAutoCompactEnabled: true,
+          apiUsage: null,
+        },
+      },
+      rateLimits: [],
+    },
+  }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box>
+        <Text>engine band</Text>
+      </Box>
+    )
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  // The measure event has no percent either: the live window has no reading.
+  await $.session.measure({
+    context: { window: 1000000 },
+    rateLimits: [],
+    changed: ['context'],
+  })
+
+  expect(await ui.find({ type: 'Text', text: /ctx 21%/ })).toBeDefined()
+  // No model-window figure to bracket: extrapolating would invent one.
+  expect(await ui.find({ type: 'Text', text: /1M/ })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('a turn that streams a step shows tok/s, exact once the stop lands', async ($, on) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
