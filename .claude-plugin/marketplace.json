@@ -1,0 +1,11 @@
+{
+  "name": "yuuchu-claude-mods",
+  "owner": { "name": "Yuuichu" },
+  "plugins": [
+    {
+      "name": "usage-statusline",
+      "source": "./usage-statusline",
+      "description": "Status line above the prompt: model, context %, rate-limit windows, cost, live tok/s"
+    }
+  ]
+}
