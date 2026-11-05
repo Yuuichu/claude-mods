@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 import type { Speed, UsageSnapshot } from '../types'
 
@@ -42,15 +42,48 @@ function hasAnything(s: UsageSnapshot | null, m: string | null): boolean {
   return s !== null || m !== null
 }
 
+/** Fill the band's atoms from what the engine can answer right now.
+ *
+ * The measure/step events only arrive with the first reply, so a freshly
+ * opened (or resumed) session would draw nothing — and leave the link
+ * button absent — until the user speaks. Everything here is answered from
+ * what the session already has on disk (the transcript's last usage, the
+ * settings' model), no API request.
+ */
+async function seedFromEngine($: EngineInterface): Promise<void> {
+  const id = await $.env.get('CLAUDE_CODE_HOST_SESSION_ID')
+  await update($, hostId, () => id ?? null)
+  try {
+    const [m, usage] = await Promise.all([
+      $.session.model(),
+      $.session.usage({ breakdown: 'summary' }),
+    ])
+    const b = usage.context.breakdown
+    await update($, model, () => m)
+    await update($, snap, () => ({
+      contextPercent: b ? b.percentage : (usage.context.percent ?? null),
+      contextPercentFull: usage.context.percent ?? null,
+      contextWindow: usage.context.window,
+      compactionWindow: b ? b.rawMaxTokens : null,
+      rateLimits: usage.rateLimits.map(r => ({ kind: r.kind, percentUsed: r.percentUsed })),
+      costUsd: usage.cost?.usd ?? null,
+    } satisfies UsageSnapshot))
+  } catch {
+    // No session bound yet (a brand-new process before its first turn): the
+    // band stays empty until the first measurement, as before.
+  }
+}
+
 export const register: Register = (on) => {
   /** Whether the band has drawn at least once on a surface that raises it. */
   let bandDrawn = false
 
   // The desktop app hands its own session id (`local_…`) to the process it
   // starts; outside the desktop app the variable is unset and no link shows.
+  // A resumed session's figures are seeded here too, so the band (and the
+  // link button) shows before the first reply.
   on('session.start', async ($, e, next) => {
-    const id = await $.env.get('CLAUDE_CODE_HOST_SESSION_ID')
-    await update($, hostId, () => id ?? null)
+    await seedFromEngine($)
     return next(e)
   })
 

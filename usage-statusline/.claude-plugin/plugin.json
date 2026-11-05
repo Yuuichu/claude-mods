@@ -1,6 +1,6 @@
 {
   "name": "usage-statusline",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Status line above the prompt: model, context %, rate-limit windows, cost, and live output tok/s estimated from turn.step, and a button that copies the session's claude:// link.",
   "types": "./types/index.d.ts",
   "author": {

@@ -28,6 +28,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
         rateLimits: [],
       },
     }))
+    on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
     on('ui.status', () => ({ value: undefined }))
     on('ui.toast', () => ({ value: undefined }))
     on('ui.copy', () => ({ value: { isCopied: false, reason: 'no-surface' } }))

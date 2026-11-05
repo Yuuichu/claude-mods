@@ -15,35 +15,38 @@ const BAND = {
 test('the band draws the status line from a measurement', async ($, on) => {
   // The engine's answers this test stands in for. The engine's own band
   // drawing: an element, like any ui.render hook.
+  on('env.get', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
-  // The mod asks the engine for a breakdown with each measurement; a
-  // compaction window as wide as the model's keeps the plain single figure.
+  // The mod asks the engine for a breakdown at start and with each
+  // measurement; a compaction window as wide as the model's keeps the plain
+  // single figure.
   on('session.usage', () => ({
     value: {
       startedAt: 0,
-    context: {
-      window: 200000,
-      breakdown: {
-        categories: [],
-        totalTokens: 84000,
-        maxTokens: 200000,
-        rawMaxTokens: 200000,
-        autocompactSource: 'auto',
-        percentage: 42,
-        gridRows: [],
-        model: 'claude-sonnet-5-5',
-        memoryFiles: [],
-        mcpTools: [],
-        agents: [],
-        isAutoCompactEnabled: true,
-        apiUsage: null,
+      context: {
+        window: 200000,
+        breakdown: {
+          categories: [],
+          totalTokens: 84000,
+          maxTokens: 200000,
+          rawMaxTokens: 200000,
+          autocompactSource: 'auto',
+          percentage: 42,
+          gridRows: [],
+          model: 'claude-sonnet-5-5',
+          memoryFiles: [],
+          mcpTools: [],
+          agents: [],
+          isAutoCompactEnabled: true,
+          apiUsage: null,
+        },
       },
-    },
-    rateLimits: [],
-    cost: { usd: 1.2345 },
+      rateLimits: [],
+      cost: { usd: 1.2345 },
     },
   }))
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
@@ -59,10 +62,13 @@ test('the band draws the status line from a measurement', async ($, on) => {
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
 
-  // Before any measurement the mod passes: the engine's own band shows.
-  expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeUndefined()
+  // The seed at session.start already drew the line: the figures come from
+  // what the engine answers, before any reply of the session.
+  const seededRow = await ui.find({ type: 'Text', text: /ctx 42%/ })
+  expect(seededRow).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\$1\.23/ })).toBeDefined()
 
-  // A measurement pushes the figures; the mod's drawing replaces the engine's.
+  // A measurement pushes the figures; the drawing stays.
   await $.session.measure({
     context: { window: 200000, percent: 42, tokens: 84000 },
     rateLimits: [
@@ -83,6 +89,7 @@ test('the band draws the status line from a measurement', async ($, on) => {
 })
 
 test('on a wide-window model the band shows the compaction fill first, the model window in brackets', async ($, on) => {
+  on('env.get', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
   // The engine's answer for a 1M-window model: the measure event's percent
@@ -112,6 +119,7 @@ test('on a wide-window model the band shows the compaction fill first, the model
     rateLimits: [],
     },
   }))
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
@@ -136,9 +144,11 @@ test('on a wide-window model the band shows the compaction fill first, the model
 })
 
 test('where the engine answers no breakdown the band falls back to the measure-event percent', async ($, on) => {
+  on('env.get', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000, percent: 19 }, rateLimits: [] } }))
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
@@ -165,6 +175,7 @@ test('where the engine answers no breakdown the band falls back to the measure-e
 })
 
 test('before the live window has a response the band shows only the compaction fill', async ($, on) => {
+  on('env.get', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
   // A fresh (or just-compacted) session: the breakdown knows the compaction
@@ -193,6 +204,7 @@ test('before the live window has a response the band shows only the compaction f
       rateLimits: [],
     },
   }))
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
@@ -219,7 +231,63 @@ test('before the live window has a response the band shows only the compaction f
   await ui.unmount()
 })
 
+test('a freshly started session draws the band before any reply', async ($, on) => {
+  on('env.get', () => ({ value: undefined }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', () => ({ changed: [] }))
+  // A resumed session: the engine answers the seed from what it already has
+  // on disk (the transcript's last usage, the settings' model).
+  on('session.usage', () => ({
+    value: {
+      startedAt: 0,
+      context: {
+        window: 1000000,
+        breakdown: {
+          categories: [],
+          totalTokens: 210000,
+          maxTokens: 252000,
+          rawMaxTokens: 252000,
+          autocompactSource: 'clientdata',
+          percentage: 83,
+          gridRows: [],
+          model: 'claude-opus-5-5[1m]',
+          memoryFiles: [],
+          mcpTools: [],
+          agents: [],
+          isAutoCompactEnabled: true,
+          apiUsage: null,
+        },
+      },
+      rateLimits: [{ kind: 'five_hour', percentUsed: 31 }],
+      cost: { usd: 2.5 },
+    },
+  }))
+  on('session.model', () => ({ value: 'claude-opus-5-5[1m]' }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box>
+        <Text>engine band</Text>
+      </Box>
+    )
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  // No measurement has ever been raised: the seed alone drew the line.
+  expect(await ui.find({ type: 'Text', text: /ctx 83%/ })).toBeDefined()
+  // The live window has no response yet: no 1M bracket.
+  expect(await ui.find({ type: 'Text', text: /1M/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /5h 31%/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\$2\.50/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /claude-opus-5-5/ })).toBeDefined()
+  await ui.unmount()
+})
+
 test('a turn that streams a step shows tok/s, exact once the stop lands', async ($, on) => {
+  on('env.get', () => ({ value: undefined }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('session.measure', () => ({ changed: [] }))
   on('session.usage', () => ({
@@ -229,6 +297,7 @@ test('a turn that streams a step shows tok/s, exact once the stop lands', async 
       rateLimits: [],
     },
   }))
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.render', ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
